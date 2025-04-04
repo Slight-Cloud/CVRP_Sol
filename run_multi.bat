@@ -19,10 +19,7 @@ set "PROBLEM_FILE=data\Vrp-Set-A\A\A-n33-k5.vrp"
 set "OUTPUT_FILE=results\A-n32-k5.sol"
 
 rem Algorithm parameters
-set "POPULATION_SIZE=100"
-set "MAX_GENERATIONS=500"
-@REM set "CROSSOVER_RATE=0.8"
-@REM set "MUTATION_RATE=0.2"
+
 
 echo Parameters:
 echo Problem file: !PROBLEM_FILE!

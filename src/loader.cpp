@@ -162,10 +162,25 @@ void ProblemLoader::parseDepotSection(const string& line, CVRPProblem& problem) 
 }
 
 bool ProblemLoader::saveSolution(const CVRPSolution& solution, const string& filename) {
-    ofstream file(filename);
+    string actual_filename = filename;
+    int counter = 1;
+    
+    // 检查文件是否存在，如果存在则重命名
+    while (ifstream(actual_filename)) {
+        // 获取文件名和扩展名
+        size_t dot_pos = filename.find_last_of(".");
+        string name = filename.substr(0, dot_pos);
+        string ext = filename.substr(dot_pos);
+        
+        // 构造新文件名
+        actual_filename = name + "(" + to_string(counter) + ")" + ext;
+        counter++;
+    }
+    
+    ofstream file(actual_filename);
     
     if (!file.is_open()) {
-        cerr << "无法创建解决方案文件: " << filename << endl;
+        cerr << "无法创建解决方案文件: " << actual_filename << endl;
         return false;
     }
     
@@ -187,6 +202,8 @@ bool ProblemLoader::saveSolution(const CVRPSolution& solution, const string& fil
         
         file << endl;
     }
+    
+    cout << "解决方案已保存到: " << actual_filename << endl;
     
     file.close();
     return true;
