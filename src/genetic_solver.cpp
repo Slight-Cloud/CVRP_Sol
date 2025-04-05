@@ -20,13 +20,12 @@ GeneticSolver::GeneticSolver(int pop_size, int max_gen, double c_rate, double m_
     // 设置默认显示间隔
     display_interval = 50;
     
-    // 初始化随机数生成器 - 使用当前时间作为种子而不仅仅依赖random_device
+    // 初始化随机数生成器
     random_device rd;
     auto current_time = chrono::high_resolution_clock::now().time_since_epoch().count();
     unsigned seed = rd() ^ static_cast<unsigned>(current_time);
-    cout << "使用随机种子: " << seed << endl;  // 输出种子值，便于调试
+    cout << "使用随机种子: " << seed << endl;
     rng.seed(seed);
-    random_engine.seed(seed);  // 确保两个随机引擎使用相同的种子
 }
 
 // 设置基本参数
@@ -317,14 +316,8 @@ void GeneticSolver::evaluateIndividual(Individual& ind, int current_generation) 
     // 计算惩罚值
     ind.overload_penalty = ind.total_overload * overload_penalty_factor;
     
-    // 计算路径数量惩罚
-    double route_penalty = 0.0;
-    if (ind.num_routes > max_vehicles) {
-        route_penalty = (ind.num_routes - max_vehicles) * route_penalty_factor;
-    }
-    
     // 计算适应度值（最小化问题转换为最大化问题）
-    ind.fitness = 1.0 / (ind.total_distance + ind.overload_penalty + route_penalty + 1.0);
+    ind.fitness = 1.0 / (ind.total_distance + ind.overload_penalty + 1.0);
 }
 
 // 解码染色体为路径

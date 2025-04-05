@@ -8,4 +8,6 @@ alwaysApply: true
 
 - You can @ files here
 - You can use markdown but dont have to
-在你想要做每个操作前，都告诉我是在做什么，还有你你这样做的目的
+在你每次想要执行一个操作前，思考一下这个操作是否必要，若我没有提到这个不要执行；
+若确定这个操作是必要的，请告诉我是你在做什么，还有你你这样做的目的。
+

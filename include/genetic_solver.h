@@ -34,17 +34,13 @@ private:
     // 遗传算法参数
     size_t population_size;     // 种群大小
     int max_generations;        // 最大迭代次数
-    double crossover_rate;      // 交叉概率
-    double mutation_rate;       // 变异概率
+    double crossover_rate;      // 当前交叉概率
+    double mutation_rate;       // 当前变异概率
     size_t tournament_size;     // 锦标赛选择的大小
     double initial_overload_tolerance; // 初始允许超载比例 (0.05表示5%)
     double overload_penalty_factor;    // 超载惩罚因子
     size_t elite_size;          // 精英数量
     bool use_local_search;      // 是否使用局部搜索
-    double local_search_rate;   // 局部搜索应用概率
-    int max_vehicles;           // 最大车辆数
-    double route_penalty_factor; // 超过最大车辆数量的惩罚系数
-    int generations_without_improvement; // 无改进代数计数
     int display_interval;       // 进度显示间隔
     
     // 自适应参数
@@ -55,8 +51,7 @@ private:
     double overload_penalty_increase_rate; // 超载惩罚增加率
     
     // 随机数生成器
-    minstd_rand rng;
-    mt19937 random_engine;  // 更好的随机数引擎
+    mt19937 rng;  // 使用更好的随机数引擎
     
     // 问题实例
     CVRPProblem problem;

@@ -1,0 +1,22 @@
+# 编译输出
+*.exe
+*.out
+*.o
+*.obj
+
+# IDE和编辑器文件
+.vscode/
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# 临时文件
+results/
+k/
+*.log
+*.tmp
+
+# 系统文件
+.DS_Store
+Thumbs.db 

@@ -1,6 +1,0 @@
-Run    Distance    Vehicles 
-1    73    5 
- 
-============================== 
-Total distance: 73 
-Average distance: 73 

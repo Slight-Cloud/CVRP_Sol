@@ -2,10 +2,12 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include <cstdlib> // 用于 system() 函数
-#include <chrono>  // 用于计时
+#include <cstdlib>   // 用于 system() 函数
+#include <chrono>    // 用于计时
 #include <algorithm> // 用于 min_element 和 max_element
-#include <cmath> // 用于 pow 和 sqrt
+#include <cmath>     // 用于 pow 和 sqrt
+#include <direct.h>  // Windows系统下使用_mkdir
+#include <io.h>      // Windows系统下使用_access
 
 #include "../include/types.h"
 #include "../include/loader.h"
@@ -80,43 +82,105 @@ void printSolutionInfo(const CVRPSolution &solution)
     // 简化路径输出，只显示路径总结信息
     for (const auto &route : solution.routes)
     {
-        cout << "车辆 " << route.vehicle_id 
-             << " [距离: " << route.total_distance 
-             << ", 载重: " << route.total_demand 
-             << ", 客户数: " << route.points.size() - 2 
+        cout << "车辆 " << route.vehicle_id
+             << " [距离: " << route.total_distance
+             << ", 载重: " << route.total_demand
+             << ", 客户数: " << route.points.size() - 2
              << "]";
-             
+
         // 只显示起点和终点
-        if (!route.points.empty()) {
+        if (!route.points.empty())
+        {
             cout << " 路径: " << route.points.front() << " -> ... -> " << route.points.back();
         }
         cout << endl;
     }
 }
 
-int main() {
+// 清空results文件夹
+void clearResultsFolder() {
+    system("del /Q .\\results\\*");  // Windows命令，删除文件夹中的所有文件
+}
+
+// 确保results文件夹存在
+void ensureResultsFolder() {
+    if (_access(".\\results", 0) == -1) {
+        _mkdir(".\\results");
+    }
+}
+
+// 从文件路径中提取问题名称
+string extractProblemName(const string& filepath) {
+    size_t start = filepath.find_last_of("/\\");
+    size_t end = filepath.find_last_of(".");
+    if (start == string::npos) start = -1;
+    if (end == string::npos) end = filepath.length();
+    return filepath.substr(start + 1, end - start - 1);
+}
+
+// 生成结果文件名
+string generateResultFileName(const string& problem_name, int run_index) {
+    return "results/" + problem_name + "-(" + to_string(run_index) + ").txt";
+}
+
+// 保存统计结果
+void saveStatistics(const string& problem_name, int run_times, double avg_distance, 
+                   double best_distance, double worst_distance, double std_dev, 
+                   double avg_vehicles, const CVRPSolution& best_solution) {
+    string stats_file = "results/" + problem_name + "_statistics.txt";
+    ofstream file(stats_file);
+    if (!file.is_open()) {
+        cout << "无法创建统计文件!" << endl;
+        return;
+    }
+
+    file << "问题名称: " << problem_name << endl;
+    file << "运行次数: " << run_times << endl;
+    file << "平均总距离: " << avg_distance << endl;
+    file << "最短距离: " << best_distance << endl;
+    file << "最长距离: " << worst_distance << endl;
+    file << "距离标准差: " << std_dev << endl;
+    file << "平均使用车辆数: " << avg_vehicles << endl;
+    file << "\n最优解详细信息:" << endl;
+    
+    // 保存最优解的路径信息
+    file << "总距离: " << best_solution.total_distance << endl;
+    file << "使用车辆数: " << best_solution.routes.size() << endl;
+    for (const auto& route : best_solution.routes) {
+        file << "车辆 " << route.vehicle_id 
+             << " [距离: " << route.total_distance 
+             << ", 载重: " << route.total_demand 
+             << ", 客户数: " << route.points.size() - 2 
+             << "] 路径: ";
+        for (size_t i = 0; i < route.points.size(); ++i) {
+            file << route.points[i];
+            if (i < route.points.size() - 1) file << " -> ";
+        }
+        file << endl;
+    }
+    
+    file.close();
+    cout << "统计信息已保存到: " << stats_file << endl;
+    cout << "平均总距离: " << avg_distance << endl;
+    cout << "最短距离: " << best_distance << endl;
+    cout << "最长距离: " << worst_distance << endl;
+    cout << "距离标准差: " << std_dev << endl;
+    cout << "平均使用车辆数: " << avg_vehicles << endl;
+}
+
+int main()
+{
     // 设置UTF-8控制台输出
     setUTF8Console();
 
-    // 输出当前运行位置
-    cout << "当前工作目录: " << getCurrentDir() << endl;
-
-    // 设置固定参数
-    int population_size = 50;
-    int max_generations = 500;
-    double crossover_rate = 0.8;
-    double mutation_rate = 0.2;
-    int tournament_size = 3;
-    int elite_count = 2;
-    bool use_local_search = true;
-    double overload_tolerance = 0.05;
-    int display_interval = 50;
-
-    string problem_filename = "data/Vrp-Set-A/A/A-n32-k5.vrp"; // 默认问题文件
-    string output_file = "results/A-n32-k5.sol";        // 默认输出文件
+    string problem_filename = "data/Vrp-Set-A/A/A-n60-k9.vrp"; // 默认问题文件
+    string output_file = "results/A-n33-k5(1).sol";             // 默认输出文件
+                                                                // 输出当前运行位置
+    cout << "当前问题文件: " << problem_filename << endl;
 
     // 检查文件是否存在
-    if (!fileExists(problem_filename)) {
+    if (!fileExists(problem_filename))
+    {
         cout << "错误: 问题文件不存在!" << endl;
         cout << "请确保文件位于正确的位置。" << endl;
         listDataFiles();
@@ -134,7 +198,6 @@ int main() {
     vector<int> all_vehicle_counts;
     double best_distance = numeric_limits<double>::infinity();
     double worst_distance = 0.0;
-    int best_run = 0;
     CVRPSolution best_solution;
 
     // 加载问题
@@ -142,42 +205,62 @@ int main() {
     CVRPProblem problem = ProblemLoader::loadProblem(problem_filename);
 
     // 检查问题是否成功加载
-    if (problem.customers.empty()) {
+    if (problem.customers.empty())
+    {
         cout << "问题加载失败或无客户点！" << endl;
         return 1;
     }
 
-    // 打印问题信息
-    printProblemInfo(problem);
+    // 基于问题规模设置参数
+    int problem_size = problem.customers.size();
+    int population_size = min(100, max(60, static_cast<int>(problem_size * 1.5))); // 种群大小为问题规模的2倍，但不小于60不大于200
+    int max_generations = 400;                                 // 保持不变
+    int tournament_size = max(3, population_size / 15);        // 锦标赛大小约为种群大小的6-7%
+    int elite_count = max(2, population_size / 30);            // 精英数量约为种群大小的3-4%
+    bool use_local_search = true;
+    int display_interval = 50;
 
-    // 输出算法参数
+    // 自适应参数（只在这里设置一次）
+    double init_crossover_rate = 0.95; // 初始交叉率高一些促进开发
+    double final_crossover_rate = 0.6; // 最终保持适度的交叉率
+    double init_mutation_rate = 0.2;   // 初始变异率适中
+    double final_mutation_rate = 0.05; // 最终降低变异率以稳定解
+
+    // 惩罚参数
+    double overload_tolerance = min(0.0, 1.0 / problem_size); // 根据问题规模调整容忍度
+    double penalty_factor = 1.0;                              // 初始惩罚因子
+    double penalty_increase = 0.01;                           // 惩罚增长率
+
+    // 输出参数设置
     cout << "\n算法参数设置：" << endl;
+    cout << "问题规模: " << problem_size << " 个客户点" << endl;
     cout << "种群大小: " << population_size << endl;
     cout << "最大代数: " << max_generations << endl;
-    cout << "交叉率: " << crossover_rate << endl;
-    cout << "变异率: " << mutation_rate << endl;
     cout << "锦标赛大小: " << tournament_size << endl;
     cout << "精英个数: " << elite_count << endl;
+    cout << "初始交叉率: " << init_crossover_rate << endl;
+    cout << "最终交叉率: " << final_crossover_rate << endl;
+    cout << "初始变异率: " << init_mutation_rate << endl;
+    cout << "最终变异率: " << final_mutation_rate << endl;
     cout << "是否使用局部搜索: " << (use_local_search ? "是" : "否") << endl;
     cout << "超载容忍度: " << overload_tolerance << endl;
     cout << "显示间隔: " << display_interval << endl;
     cout << "\n开始求解..." << endl;
 
+    // 确保results文件夹存在并清空
+    ensureResultsFolder();
+    clearResultsFolder();
+
+    // 获取问题名称
+    string problem_name = extractProblemName(problem_filename);
+    
     // 多次运行求解器
     for (int run = 1; run <= run_times; run++) {
         cout << "\n第 " << run << " 次运行:" << endl;
         cout << "----------------------------------------" << endl;
 
-        // 创建求解器并设置基本参数
-        GeneticSolver solver(population_size, max_generations, crossover_rate, mutation_rate, tournament_size);
-        
-        // 设置高级参数
-        double penalty_factor = 1.0;       // 超载惩罚因子
-        double init_crossover_rate = 0.9;  // 初始交叉率
-        double final_crossover_rate = 0.6; // 最终交叉率
-        double init_mutation_rate = 0.2;   // 初始变异率
-        double final_mutation_rate = 0.1;  // 最终变异率
-        double penalty_increase = 0.01;    // 每代增加的惩罚率
+        // 创建求解器并设置参数
+        GeneticSolver solver(population_size, max_generations, init_crossover_rate, init_mutation_rate, tournament_size);
         
         // 设置高级参数
         solver.setAdvancedParameters(
@@ -192,10 +275,8 @@ int main() {
             penalty_increase
         );
 
-        // 设置显示间隔
         solver.setDisplayInterval(display_interval);
         
-        // 开始求解
         try {
             CVRPSolution solution = solver.solve(problem);
             
@@ -207,7 +288,6 @@ int main() {
             // 更新最优解
             if (solution.total_distance < best_distance) {
                 best_distance = solution.total_distance;
-                best_run = run;
                 best_solution = solution;
             }
             
@@ -216,19 +296,14 @@ int main() {
                 worst_distance = solution.total_distance;
             }
 
-            // 保存最优解决方案到文件
-            if (run == best_run) {
-                if (ProblemLoader::saveSolution(solution, output_file)) {
-                    cout << "最优解已保存到: " << output_file << endl;
-                }
+            // 保存当前运行的解决方案
+            string result_file = generateResultFileName(problem_name, run);
+            if (ProblemLoader::saveSolution(solution, result_file)) {
+                cout << "解决方案已保存到: " << result_file << endl;
             }
         }
         catch (const exception& e) {
             cout << "求解过程中发生异常: " << e.what() << endl;
-            continue;
-        }
-        catch (...) {
-            cout << "求解过程中发生未知异常!" << endl;
             continue;
         }
     }
@@ -242,26 +317,17 @@ int main() {
     variance /= run_times;
     double std_dev = sqrt(variance);
 
-    // 计算车辆数统计
+    // 计算平均车辆数
     double avg_vehicles = 0.0;
     for (int count : all_vehicle_counts) {
         avg_vehicles += count;
     }
     avg_vehicles /= run_times;
 
-    // 输出统计信息
-    cout << "\n----------------------------------------" << endl;
-    cout << "运行统计信息:" << endl;
-    cout << "总运行次数: " << run_times << endl;
-    cout << "平均总距离: " << avg_distance << endl;
-    cout << "最短距离: " << best_distance << " (第" << best_run << "次运行)" << endl;
-    cout << "最长距离: " << worst_distance << endl;
-    cout << "距离标准差: " << std_dev << endl;
-    cout << "平均使用车辆数: " << avg_vehicles << endl;
-    cout << "\n最优解详细信息:" << endl;
-    printSolutionInfo(best_solution);
+    // 保存统计信息
+    saveStatistics(problem_name, run_times, avg_distance, best_distance, 
+                  worst_distance, std_dev, avg_vehicles, best_solution);
 
-    // 等待用户输入后退出
     cout << "\n按回车键退出程序...";
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cin.get();
