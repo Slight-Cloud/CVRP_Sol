@@ -6,6 +6,10 @@
             "type": "shell",
             "command": "g++",
             "args": [
+                "-std=c++17",
+                "-Wall",
+                "-Wextra",
+                "-g",
                 "src/main_genetic.cpp",
                 "src/loader.cpp",
                 "src/genetic_solver.cpp",
@@ -17,6 +21,85 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "windows": {
+                "args": [
+                    "-std=c++17",
+                    "-Wall",
+                    "-Wextra",
+                    "-g",
+                    "src/main_genetic.cpp",
+                    "src/loader.cpp",
+                    "src/genetic_solver.cpp",
+                    "-I",
+                    "include",
+                    "-o",
+                    "cvrp_genetic.exe"
+                ]
+            }
+        },
+        {
+            "label": "create_directories",
+            "type": "shell",
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "bin",
+                "results"
+            ],
+            "windows": {
+                "command": "cmd",
+                "args": [
+                    "/C",
+                    "if not exist bin mkdir bin && if not exist results mkdir results"
+                ]
+            },
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "run",
+            "type": "shell",
+            "command": "./cvrp_genetic",
+            "windows": {
+                "command": ".\\cvrp_genetic.exe"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "dependsOn": ["build"]
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "rm",
+            "args": [
+                "cvrp_genetic",
+                "cvrp_genetic.exe"
+            ],
+            "windows": {
+                "command": "cmd",
+                "args": [
+                    "/C",
+                    "if exist cvrp_genetic.exe del cvrp_genetic.exe"
+                ]
+            },
+            "presentation": {
+                "reveal": "silent"
             }
         }
     ]

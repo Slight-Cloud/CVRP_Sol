@@ -68,25 +68,6 @@ CVRPSolution GeneticSolver::solve(const CVRPProblem& prob) {
         // 保存问题实例
         problem = prob;
         
-        // 创建距离矩阵
-        // 距离矩阵包括仓库（索引0）和所有客户（索引1到n）
-        int n = problem.customers.size() + 1;
-        distance_matrix.resize(n, vector<double>(n, 0.0));
-        
-        // 计算仓库到所有客户的距离
-        for (size_t i = 0; i < problem.customers.size(); ++i) {
-            distance_matrix[0][i+1] = calculateDistance(problem.depot, problem.customers[i]);
-            distance_matrix[i+1][0] = distance_matrix[0][i+1]; // 对称
-        }
-        
-        // 计算客户之间的距离
-        for (size_t i = 0; i < problem.customers.size(); ++i) {
-            for (size_t j = i+1; j < problem.customers.size(); ++j) {
-                distance_matrix[i+1][j+1] = calculateDistance(problem.customers[i], problem.customers[j]);
-                distance_matrix[j+1][i+1] = distance_matrix[i+1][j+1]; // 对称
-            }
-        }
-        
         cout << "初始化算法..." << endl;
         // 初始化算法
         initialize();
@@ -139,17 +120,17 @@ CVRPSolution GeneticSolver::solve(const CVRPProblem& prob) {
                 }
                 
                 // 评估适应度
-                evaluateIndividual(offspring1, gen, true);
-                evaluateIndividual(offspring2, gen, true);
+                evaluateIndividual(offspring1, gen);
+                evaluateIndividual(offspring2, gen);
                 
                 // 局部搜索（如果启用）
                 if (use_local_search && getRandomDouble(0.0, 1.0) < 0.1) {
                     twoOptLocalSearch(offspring1);
-                    evaluateIndividual(offspring1, gen, true); // 重新评估
+                    evaluateIndividual(offspring1, gen); // 重新评估
                 }
                 if (use_local_search && getRandomDouble(0.0, 1.0) < 0.1) {
                     twoOptLocalSearch(offspring2);
-                    evaluateIndividual(offspring2, gen, true); // 重新评估
+                    evaluateIndividual(offspring2, gen); // 重新评估
                 }
                 
                 // 添加到新种群
@@ -219,67 +200,34 @@ double GeneticSolver::calculateDistance(const Point& a, const Point& b) const {
 }
 
 // 计算路径距离
-double GeneticSolver::calculateRouteDistance(const vector<int>& route, bool simple_output) const {
-    try {
-        if (route.size() < 2) {
-            return 0.0;
+double GeneticSolver::calculateRouteDistance(const vector<int>& route_points) const {
+    if (route_points.size() < 2) return 0.0;  // 路径至少需要包含仓库和一个客户
+    
+    double total_distance = 0.0;
+    
+    // 计算路径上相邻点之间的距离
+    for (size_t i = 0; i < route_points.size() - 1; ++i) {
+        int current_id = route_points[i];    // 当前点ID（1是仓库，2到n+1是客户）
+        int next_id = route_points[i + 1];   // 下一个点ID
+        
+        // 检查点ID的有效性
+        if (current_id < 1 || current_id > static_cast<int>(problem.customers.size() + 1)) {
+            throw runtime_error("Invalid point ID in route: " + to_string(current_id));
+        }
+        if (next_id < 1 || next_id > static_cast<int>(problem.customers.size() + 1)) {
+            throw runtime_error("Invalid point ID in route: " + to_string(next_id));
         }
         
-        double distance = 0.0;
+        // 获取当前点和下一个点的坐标
+        // 如果ID为1，使用仓库坐标；否则，使用客户坐标（需要将ID转换为索引：ID-2）
+        Point current_point = (current_id == 1) ? problem.depot : problem.customers[current_id - 2];
+        Point next_point = (next_id == 1) ? problem.depot : problem.customers[next_id - 2];
         
-        for (size_t i = 0; i < route.size() - 1; ++i) {
-            int from = route[i];
-            int to = route[i + 1];
-            
-            // 计算有效的矩阵索引
-            // 对于仓库，索引为0；对于客户，需要找到在数组中的位置
-            int from_idx = (from == problem.depot.id) ? 0 : -1;
-            int to_idx = (to == problem.depot.id) ? 0 : -1;
-            
-            // 如果不是仓库，则查找客户在列表中的位置
-            if (from_idx == -1) {
-                for (size_t j = 0; j < problem.customers.size(); ++j) {
-                    if (problem.customers[j].id == from) {
-                        from_idx = j + 1; // 客户索引从1开始
-                        break;
-                    }
-                }
-            }
-            
-            if (to_idx == -1) {
-                for (size_t j = 0; j < problem.customers.size(); ++j) {
-                    if (problem.customers[j].id == to) {
-                        to_idx = j + 1; // 客户索引从1开始
-                        break;
-                    }
-                }
-            }
-            
-            // 检查索引是否有效
-            if (from_idx < 0 || from_idx >= distance_matrix.size() || 
-                to_idx < 0 || to_idx >= distance_matrix.size()) {
-                cout << "错误: 无效的索引 [" << from_idx << "][" << to_idx << "], 矩阵大小: " 
-                     << distance_matrix.size() << "x" 
-                     << (distance_matrix.empty() ? 0 : distance_matrix[0].size()) << endl;
-                cout << "原始客户ID: [" << from << "][" << to << "]" << endl;
-                return 0.0;
-            }
-            
-            // 使用距离矩阵
-            double segment_distance = distance_matrix[from_idx][to_idx];
-            distance += segment_distance;
-        }
-        
-        return distance;
+        // 计算两点之间的距离
+        total_distance += calculateDistance(current_point, next_point);
     }
-    catch (const exception& e) {
-        cout << "计算路径距离时发生异常: " << e.what() << endl;
-        throw;
-    }
-    catch (...) {
-        cout << "计算路径距离时发生未知异常!" << endl;
-        throw;
-    }
+    
+    return total_distance;
 }
 
 // 初始化种群
@@ -289,13 +237,10 @@ void GeneticSolver::initialize() {
         
         // 清空当前种群
         population.clear();
-        population.reserve(population_size);
         
-        // 创建客户ID列表
-        vector<int> customer_ids;
-        for (const auto& customer : problem.customers) {
-            customer_ids.push_back(customer.id);
-        }
+        // 创建客户ID列表（从0开始，对应customers数组中的索引）
+        vector<int> customer_ids(problem.customers.size());
+        iota(customer_ids.begin(), customer_ids.end(), 0);  // 填充0到n-1的序列，n为客户数量
         
         // 重置最佳个体
         best_individual = Individual();
@@ -306,16 +251,15 @@ void GeneticSolver::initialize() {
         worst_individual.fitness = numeric_limits<double>::infinity();
         
         // 生成初始种群
-        for (int i = 0; i < population_size; ++i) {
+        for (size_t i = 0; i < population_size; ++i) {
             Individual ind;
             
             // 复制客户ID列表并随机打乱
             ind.chromosome = customer_ids;
-            // 使用C++11的shuffle而不是已弃用的random_shuffle
             shuffle(ind.chromosome.begin(), ind.chromosome.end(), rng);
             
-            // 评估个体（避免冗余日志）
-            evaluateIndividual(ind, 0, true);
+            // 评估个体
+            evaluateIndividual(ind, 0);
             
             // 添加到种群
             population.push_back(ind);
@@ -351,120 +295,98 @@ void GeneticSolver::initialize() {
 }
 
 // 评估个体适应度
-void GeneticSolver::evaluateIndividual(Individual& ind, int current_generation, bool simple_output) {
-    try {
-        // 计算当前代数的超载容忍度（随时间递减）
-        double current_overload_tolerance = initial_overload_tolerance * 
-                                          (1.0 - static_cast<double>(current_generation) / max_generations);
-        
-        // 计算当前代数的超载惩罚因子（随时间递增）
-        double current_penalty_factor = overload_penalty_factor * 
-                                      (1.0 + overload_penalty_increase_rate * current_generation);
-        
-        // 解码染色体，获取路径（允许轻微超载）
-        ind.routes = decodeChromosome(ind.chromosome, current_overload_tolerance, simple_output);
-        
-        // 计算总距离和超载惩罚
-        ind.total_distance = 0.0;
-        ind.overload_penalty = 0.0;
-        
-        for (const auto& route : ind.routes) {
-            ind.total_distance += route.total_distance;
-            
-            // 检查是否超载，如果超载则添加惩罚
-            if (route.total_demand > problem.vehicle_capacity) {
-                double overload = route.total_demand - problem.vehicle_capacity;
-                double overload_ratio = overload / problem.vehicle_capacity;
-                
-                // 惩罚随超载程度非线性增加
-                double route_penalty = current_penalty_factor * overload_ratio * overload_ratio * 1000;
-                ind.overload_penalty += route_penalty;
-            }
+void GeneticSolver::evaluateIndividual(Individual& ind, int current_generation) {
+    // 解码染色体获取路径
+    double current_overload_tolerance = initial_overload_tolerance * 
+        pow(1.0 - overload_penalty_increase_rate, current_generation);
+    ind.routes = decodeChromosome(ind.chromosome, current_overload_tolerance);
+    
+    // 计算总距离和超载惩罚
+    ind.total_distance = 0.0;
+    ind.total_overload = 0.0;
+    ind.num_routes = static_cast<int>(ind.routes.size());
+    
+    for (const Route& route : ind.routes) {
+        ind.total_distance += route.total_distance;
+        double overload = route.total_demand - problem.vehicle_capacity;
+        if (overload > 0) {
+            ind.total_overload += overload;
         }
-        
-        // 计算适应度（距离和超载惩罚的加权组合）
-        double distance_factor = 1.0 / (ind.total_distance + 1.0);  // 加1避免除以0
-        double penalty_factor = 1.0 / (1.0 + ind.overload_penalty); // 加1避免除以0
-        
-        // 适应度是距离因子和惩罚因子的加权平均（这里采用的是最大化问题的适应度）
-        ind.fitness = distance_factor * 0.8 + penalty_factor * 0.2;
     }
-    catch (const exception& e) {
-        cout << "评估适应度时发生异常: " << e.what() << endl;
-        throw;
+    
+    // 计算惩罚值
+    ind.overload_penalty = ind.total_overload * overload_penalty_factor;
+    
+    // 计算路径数量惩罚
+    double route_penalty = 0.0;
+    if (ind.num_routes > max_vehicles) {
+        route_penalty = (ind.num_routes - max_vehicles) * route_penalty_factor;
     }
-    catch (...) {
-        cout << "评估适应度时发生未知异常!" << endl;
-        throw;
-    }
+    
+    // 计算适应度值（最小化问题转换为最大化问题）
+    ind.fitness = 1.0 / (ind.total_distance + ind.overload_penalty + route_penalty + 1.0);
 }
 
 // 解码染色体为路径
-vector<Route> GeneticSolver::decodeChromosome(const vector<int>& chromosome, double overload_tolerance, bool simple_output) const {
-    try {
-        vector<Route> routes;
-        Route current_route;
-        int depot_id = problem.depot.id;
-        current_route.points.push_back(depot_id); // 起始点是仓库
-        double current_load = 0.0;
-        double overload_limit = problem.vehicle_capacity * (1.0 + overload_tolerance);
+vector<Route> GeneticSolver::decodeChromosome(const vector<int>& chromosome, double overload_tolerance) const {
+    vector<Route> routes;
+    Route current_route;
+    double current_load = 0.0;
+    double capacity_with_tolerance = problem.vehicle_capacity * (1.0 + overload_tolerance);
+    
+    // 初始化第一条路径，从仓库开始（仓库ID为1）
+    current_route.points.push_back(1);
+    
+    for (size_t i = 0; i < chromosome.size(); ++i) {
+        int chromosome_idx = chromosome[i];  // 染色体中的索引（0到n-1）
         
-        for (int customer_id : chromosome) {
-            // 查找客户需求
-            double demand = 0.0;
-            bool found = false;
-            
-            for (const auto& customer : problem.customers) {
-                if (customer.id == customer_id) {
-                    demand = customer.demand;
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (!found) {
-                continue; // 跳过这个客户
-            }
-            
-            // 如果添加这个客户会导致超载，则开始一个新路径
-            if (current_load + demand > overload_limit) {
-                // 完成当前路径
-                current_route.points.push_back(depot_id); // 终点是仓库
-                current_route.total_demand = current_load;
-                current_route.total_distance = calculateRouteDistance(current_route.points, simple_output);
-                
-                // 添加到路径列表
+        // 验证染色体索引的有效性
+        if (chromosome_idx < 0 || chromosome_idx >= static_cast<int>(problem.customers.size())) {
+            throw runtime_error("Invalid customer index: " + to_string(chromosome_idx));
+        }
+        
+        // 转换为客户ID（客户ID从2开始）
+        int customer_id = chromosome_idx + 2;
+        
+        // 获取客户需求（使用染色体索引访问customers数组）
+        double demand = problem.customers[chromosome_idx].demand;
+        
+        // 如果添加当前客户会超过容量限制（考虑容忍度）
+        if (current_load + demand > capacity_with_tolerance) {
+            // 完成当前路径
+            if (current_route.points.size() > 1) {  // 如果路径中有客户
+                current_route.points.push_back(1);  // 返回仓库
                 routes.push_back(current_route);
-                
                 // 开始新路径
                 current_route.points.clear();
-                current_route.points.push_back(depot_id);
+                current_route.points.push_back(1);  // 从仓库开始
                 current_load = 0.0;
             }
-            
-            // 添加客户到当前路径
-            current_route.points.push_back(customer_id);
-            current_load += demand;
         }
         
-        // 处理最后一条路径
-        if (current_route.points.size() > 1) {
-            current_route.points.push_back(depot_id); // 终点是仓库
-            current_route.total_demand = current_load;
-            current_route.total_distance = calculateRouteDistance(current_route.points, simple_output);
-            routes.push_back(current_route);
+        // 添加客户到当前路径
+        current_route.points.push_back(customer_id);
+        current_load += demand;
+    }
+    
+    // 添加最后一条路径（如果有的话）
+    if (current_route.points.size() > 1) {  // 如果路径中有客户
+        current_route.points.push_back(1);  // 返回仓库
+        routes.push_back(current_route);
+    }
+    
+    // 计算每条路径的距离和需求
+    for (Route& route : routes) {
+        route.total_distance = calculateRouteDistance(route.points);
+        route.total_demand = 0.0;
+        for (size_t i = 1; i < route.points.size() - 1; ++i) {  // 跳过起点和终点（仓库）
+            int point_id = route.points[i];  // 这是客户ID（从2开始）
+            int chromosome_idx = point_id - 2;  // 转换回染色体索引
+            route.total_demand += problem.customers[chromosome_idx].demand;
         }
-        
-        return routes;
     }
-    catch (const exception& e) {
-        cout << "解码染色体时发生异常: " << e.what() << endl;
-        throw;
-    }
-    catch (...) {
-        cout << "解码染色体时发生未知异常!" << endl;
-        throw;
-    }
+    
+    return routes;
 }
 
 // 锦标赛选择
@@ -763,13 +685,11 @@ void GeneticSolver::applyEliteStrategy() {
 }
 
 // 路径导向交叉
-// 该交叉方法优先保留父代中的完整路径
 void GeneticSolver::pathOrientedCrossover(const Individual& parent1, const Individual& parent2,
                                          Individual& offspring1, Individual& offspring2) {
     // 选择解码后的路径，而不是直接使用染色体
-    // 注意：为了交叉，需要先解码父代染色体
-    vector<Route> routes_parent1 = decodeChromosome(parent1.chromosome, initial_overload_tolerance, true);
-    vector<Route> routes_parent2 = decodeChromosome(parent2.chromosome, initial_overload_tolerance, true);
+    vector<Route> routes_parent1 = decodeChromosome(parent1.chromosome, initial_overload_tolerance);
+    vector<Route> routes_parent2 = decodeChromosome(parent2.chromosome, initial_overload_tolerance);
     
     // 清空后代染色体
     offspring1.chromosome.clear();
@@ -806,9 +726,10 @@ void GeneticSolver::pathOrientedCrossover(const Individual& parent1, const Indiv
     for (int route_idx : selected_route_indices1) {
         const Route& route = routes_parent1[route_idx];
         for (size_t i = 1; i < route.points.size() - 1; ++i) { // 跳过起点和终点（仓库）
-            int customer_id = route.points[i];
-            offspring1.chromosome.push_back(customer_id);
-            added_customers1.insert(customer_id);
+            int point_id = route.points[i];
+            int customer_idx = point_id - 2;  // 从ID转回索引
+            offspring1.chromosome.push_back(customer_idx);
+            added_customers1.insert(customer_idx);
         }
     }
     
@@ -819,31 +740,31 @@ void GeneticSolver::pathOrientedCrossover(const Individual& parent1, const Indiv
     for (int route_idx : selected_route_indices2) {
         const Route& route = routes_parent2[route_idx];
         for (size_t i = 1; i < route.points.size() - 1; ++i) { // 跳过起点和终点（仓库）
-            int customer_id = route.points[i];
-            offspring2.chromosome.push_back(customer_id);
-            added_customers2.insert(customer_id);
+            int point_id = route.points[i];
+            int customer_idx = point_id - 2;  // 从ID转回索引
+            offspring2.chromosome.push_back(customer_idx);
+            added_customers2.insert(customer_idx);
         }
     }
     
     // 从父代2中获取未添加到后代1的客户
-    for (int customer_id : parent2.chromosome) {
-        if (added_customers1.find(customer_id) == added_customers1.end()) {
-            offspring1.chromosome.push_back(customer_id);
-            added_customers1.insert(customer_id);
+    for (int customer_idx : parent2.chromosome) {
+        if (added_customers1.find(customer_idx) == added_customers1.end()) {
+            offspring1.chromosome.push_back(customer_idx);
+            added_customers1.insert(customer_idx);
         }
     }
     
     // 从父代1中获取未添加到后代2的客户
-    for (int customer_id : parent1.chromosome) {
-        if (added_customers2.find(customer_id) == added_customers2.end()) {
-            offspring2.chromosome.push_back(customer_id);
-            added_customers2.insert(customer_id);
+    for (int customer_idx : parent1.chromosome) {
+        if (added_customers2.find(customer_idx) == added_customers2.end()) {
+            offspring2.chromosome.push_back(customer_idx);
+            added_customers2.insert(customer_idx);
         }
     }
 }
 
 // 局部搜索 - 2-opt算法
-// 该算法尝试通过反转路径的一部分来减少总距离
 void GeneticSolver::twoOptLocalSearch(Individual& ind) {
     // 解码染色体获取路径
     vector<Route> routes = ind.routes;
@@ -851,7 +772,7 @@ void GeneticSolver::twoOptLocalSearch(Individual& ind) {
     
     // 对每条路径进行2-opt优化
     for (auto& route : routes) {
-        if (route.points.size() <= 4) continue; // 至少需要4个点才能进行2-opt
+        if (route.points.size() <= 4) continue; // 至少需要4个点才能进行2-opt（仓库-客户-客户-仓库）
         
         // 反转路径中的两个点之间的段落，尝试改进
         for (size_t i = 1; i < route.points.size() - 2; ++i) {
@@ -870,8 +791,10 @@ void GeneticSolver::twoOptLocalSearch(Individual& ind) {
         // 重新构造染色体序列
         vector<int> new_chromosome;
         for (const auto& route : routes) {
-            for (size_t i = 1; i < route.points.size() - 1; ++i) { // 跳过起点和终点（仓库）
-                new_chromosome.push_back(route.points[i]);
+            for (size_t i = 1; i < route.points.size() - 1; ++i) {  // 跳过起点和终点（仓库）
+                int point_id = route.points[i];  // 这是客户ID（从2开始）
+                int chromosome_idx = point_id - 2;  // 转换回染色体索引
+                new_chromosome.push_back(chromosome_idx);
             }
         }
         

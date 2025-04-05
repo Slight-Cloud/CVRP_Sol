@@ -32,14 +32,14 @@ struct Individual {
 class GeneticSolver {
 private:
     // 遗传算法参数
-    int population_size;        // 种群大小
+    size_t population_size;     // 种群大小
     int max_generations;        // 最大迭代次数
     double crossover_rate;      // 交叉概率
     double mutation_rate;       // 变异概率
-    int tournament_size;        // 锦标赛选择的大小
+    size_t tournament_size;     // 锦标赛选择的大小
     double initial_overload_tolerance; // 初始允许超载比例 (0.05表示5%)
     double overload_penalty_factor;    // 超载惩罚因子
-    int elite_size;             // 精英数量
+    size_t elite_size;          // 精英数量
     bool use_local_search;      // 是否使用局部搜索
     double local_search_rate;   // 局部搜索应用概率
     int max_vehicles;           // 最大车辆数
@@ -60,12 +60,6 @@ private:
     
     // 问题实例
     CVRPProblem problem;
-    
-    // 距离矩阵
-    vector<vector<double>> distance_matrix;
-    
-    // 客户需求
-    vector<double> demands;
     
     // 种群
     vector<Individual> population;
@@ -106,11 +100,11 @@ private:
     void initialize();
     
     // 评估适应度
-    void evaluateIndividual(Individual& ind, int current_generation = 0, bool simple_output = false);
-    double calculateRouteDistance(const vector<int>& route_points, bool simple_output = false) const;
+    void evaluateIndividual(Individual& ind, int current_generation = 0);
+    double calculateRouteDistance(const vector<int>& route_points) const;
     
     // 解码染色体为路径 (现在允许轻微超载)
-    vector<Route> decodeChromosome(const vector<int>& chromosome, double overload_tolerance, bool simple_output = false) const;
+    vector<Route> decodeChromosome(const vector<int>& chromosome, double overload_tolerance) const;
     
     // 选择操作
     Individual tournamentSelection(int tournament_size);

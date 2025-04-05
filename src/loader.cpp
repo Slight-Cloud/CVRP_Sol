@@ -142,22 +142,26 @@ void ProblemLoader::parseDepotSection(const string& line, CVRPProblem& problem) 
     int id;
     
     if (iss >> id && id != -1) {
-        // 设置仓库ID
-       if(id == 1){
-        problem.depot.id = id;
-       }
-       //否则应该修改仓库的id 以及删除数组中对应的id，将1加进去
-       else{
-        problem.depot.id = id;
-        for(auto it = problem.customers.begin(); it != problem.customers.end(); ++it){
-            if(it->id == id){
-                problem.customers.erase(it);
-                break;
+        // 确认仓库ID
+        if(id != 1) {
+            // 如果仓库ID不是1，需要调整
+            Point temp = problem.depot;  // 保存原仓库信息
+            
+            // 在customers中找到新的仓库点
+            for(auto it = problem.customers.begin(); it != problem.customers.end(); ++it) {
+                if(it->id == id) {
+                    // 将这个点设为仓库
+                    problem.depot = *it;
+                    problem.depot.id = 1;  // 仓库ID始终为1
+                    problem.depot.demand = 0.0;  // 仓库需求为0
+                    
+                    // 将原仓库点（现在是客户点）添加到customers
+                    temp.id = 1;  // 临时设为1
+                    problem.customers.erase(it);
+                    break;
+                }
             }
         }
-        problem.customers.insert(problem.customers.begin(), Point(1, problem.depot.x, problem.depot.y, 0.0));
-       }
-
     }
 }
 
@@ -216,7 +220,6 @@ bool ProblemLoader::validateSolution(const CVRPSolution& solution, const CVRPPro
     // 检查容量约束和路径有效性
     for (const auto& route : solution.routes) {
         double total_demand = 0.0;
-        int prev_point = problem.depot.id;
         
         for (size_t i = 0; i < route.points.size(); ++i) {
             int current_point = route.points[i];
